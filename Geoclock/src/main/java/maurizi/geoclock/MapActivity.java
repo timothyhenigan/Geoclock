@@ -9,7 +9,8 @@ import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import com.google.android.gms.location.LocationClient;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.SupportMapFragment;
@@ -34,7 +35,7 @@ public class MapActivity extends ActionBarActivity
 	 */
 	private NavigationDrawerFragment navigationDrawerFragment;
 	private GoogleMap map = null;
-	private LocationClient locationClient = null;
+	private GoogleApiClient apiClient = null;
 	private BiMap<GeoAlarm, Marker> markers = null;
 
 	@Override
@@ -49,9 +50,13 @@ public class MapActivity extends ActionBarActivity
 		                           .replace(R.id.navigation_drawer, navigationDrawerFragment)
 		                           .commit();
 
-		final LocationClientHandler handler = new LocationClientHandler();
-		locationClient = new LocationClient(this, handler, handler);
-		locationClient.connect();
+		final GoogleApiClientHandler handler = new GoogleApiClientHandler();
+		apiClient = new GoogleApiClient.Builder(this)
+				            .addApi(LocationServices.API)
+				            .addConnectionCallbacks(handler)
+				            .addOnConnectionFailedListener(handler)
+				            .build();
+		apiClient.connect();
 		markers = HashBiMap.create();
 	}
 
@@ -127,8 +132,8 @@ public class MapActivity extends ActionBarActivity
 		}
 	}
 
-	private class LocationClientHandler extends ToastLocationClientHandler {
-		public LocationClientHandler() {
+	private class GoogleApiClientHandler extends ToastLocationClientHandler {
+		public GoogleApiClientHandler() {
 			super(MapActivity.this);
 		}
 
@@ -136,7 +141,7 @@ public class MapActivity extends ActionBarActivity
 		public void onConnected(Bundle bundle) {
 			super.onConnected(bundle);
 			if (map != null) {
-				final Location loc = locationClient.getLastLocation();
+				final Location loc = LocationServices.FusedLocationApi.getLastLocation(apiClient);
 				if (loc != null) {
 					map.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(loc.getLatitude(), loc.getLongitude()),
 					                                                 DEFAULT_ZOOM_LEVEL));

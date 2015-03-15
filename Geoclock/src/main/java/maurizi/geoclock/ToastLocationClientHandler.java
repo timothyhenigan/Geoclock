@@ -5,11 +5,11 @@ import android.os.Bundle;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesClient;
+import com.google.android.gms.common.api.GoogleApiClient;
 
 
 public class ToastLocationClientHandler
-		implements GooglePlayServicesClient.ConnectionCallbacks, GooglePlayServicesClient.OnConnectionFailedListener {
+		implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 	private final Context context;
 
 	public ToastLocationClientHandler(Context context) {
@@ -21,7 +21,7 @@ public class ToastLocationClientHandler
 	}
 
 	@Override
-	public void onDisconnected() {
+	public void onConnectionSuspended(int cause) {
 		Toast.makeText(context, R.string.lost_location, Toast.LENGTH_SHORT).show();
 	}
 

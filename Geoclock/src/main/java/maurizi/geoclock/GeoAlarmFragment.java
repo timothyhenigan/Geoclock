@@ -16,8 +16,11 @@ import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
-import com.google.android.gms.location.LocationClient;
-import com.google.android.gms.location.LocationStatusCodes;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.GeofencingRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.SupportMapFragment;
@@ -65,7 +68,7 @@ public class GeoAlarmFragment extends DialogFragment {
 	private final static int INITIAL_RADIUS = 20;
 	private final static int MAX_RADIUS = 200;
 
-	private LocationClient locationClient = null;
+	private GoogleApiClient apiClient = null;
 
 	@InjectView(R.id.scrollView) LockableScrollView scrollView;
 	@InjectView(R.id.add_geo_alarm_name) TextView nameTextBox;
@@ -111,8 +114,10 @@ public class GeoAlarmFragment extends DialogFragment {
 			timePicker.setCurrentHour(alarm.hour);
 			timePicker.setCurrentMinute(alarm.minute);
 			nameTextBox.setText(alarm.name);
-			for (DayOfWeek day : alarm.days) {
-				checkboxes.get(day).setChecked(true);
+			if (alarm.days != null) {
+				for (DayOfWeek day : alarm.days) {
+					checkboxes.get(day).setChecked(true);
+				}
 			}
 		}
 
@@ -184,20 +189,24 @@ public class GeoAlarmFragment extends DialogFragment {
 			                                                                .keySet()))
 			                                  .hour(timePicker.getCurrentHour())
 			                                  .minute(timePicker.getCurrentMinute())
-			                                  .geofenceId(alarm.geofenceId)
 			                                  .build();
 
-			locationClient.addGeofences(Arrays.asList(newAlarm.getGeofence()),
-			                            GeofenceReceiver.getPendingIntent(getActivity()), (status, ids) -> {
-						if (status == LocationStatusCodes.SUCCESS) {
-							GeoAlarm addedAlarm = newAlarm.withGeofenceId(ids[0]);
-							GeoAlarm.replace(activity, alarm, addedAlarm);
-							activity.onAddGeoAlarmFragmentClose(GeoAlarmFragment.this);
+			final GeofencingRequest request = new GeofencingRequest.Builder()
+					                                               .addGeofence(newAlarm.getGeofence())
+					                                               .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+					                                               .build();
+			final PendingResult<Status> pendingResult = LocationServices.GeofencingApi.addGeofences(apiClient, request,
+			                                                                         GeofenceReceiver.getPendingIntent(getActivity()));
 
-							dialog.dismiss();
-						}
-						locationClient.disconnect();
-					});
+
+			pendingResult.setResultCallback(result -> {
+				if (result.isSuccess()) {
+					activity.onAddGeoAlarmFragmentClose(GeoAlarmFragment.this);
+
+					dialog.dismiss();
+				}
+				apiClient.disconnect();
+			});
 		});
 	}
 
@@ -206,7 +215,11 @@ public class GeoAlarmFragment extends DialogFragment {
 		final View dialogView = inflater.inflate(R.layout.fragment_add_geo_alarm_dialog, container, false);
 
 		final ToastLocationClientHandler handler = new ToastLocationClientHandler(getActivity());
-		locationClient = new LocationClient(getActivity(), handler, handler);
+		apiClient = new GoogleApiClient.Builder(getActivity())
+				            .addApi(LocationServices.API)
+				            .addConnectionCallbacks(handler)
+				            .addOnConnectionFailedListener(handler)
+				            .build();
 		ButterKnife.inject(this, dialogView);
 
 		return dialogView;
@@ -221,7 +234,7 @@ public class GeoAlarmFragment extends DialogFragment {
 	@Override
 	public void onStart() {
 		super.onStart();
-		locationClient.connect();
+		apiClient.connect();
 
 		mapFragment = SupportMapFragment.newInstance();
 		getChildFragmentManager().beginTransaction().replace(R.id.add_geo_alarm_map_container, mapFragment).commit();
