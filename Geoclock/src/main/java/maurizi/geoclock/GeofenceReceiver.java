@@ -5,13 +5,11 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
-import android.os.Bundle;
 
 import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.LocationClient;
+import com.google.android.gms.location.GeofencingEvent;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -29,10 +27,12 @@ public class GeofenceReceiver extends AbstractGeoAlarmReceiver {
 	private static final String ACTIVE_ALARM_PREFS = "active_alarm_prefs";
 
 	@Override
-	public void onConnected(Bundle bundle) {
-		final int transition = LocationClient.getGeofenceTransition(this.intent);
+	public void onReceive(Context context, Intent intent) {
+		super.onReceive(context, intent);
+		GeofencingEvent event = GeofencingEvent.fromIntent(this.intent);
+		final int transition = event.getGeofenceTransition();
 
-		final List<Geofence> affectedGeofences = LocationClient.getTriggeringGeofences(intent);
+		final List<Geofence> affectedGeofences = event.getTriggeringGeofences();
 		final ImmutableSet<GeoAlarm> affectedAlarms = ImmutableSet.copyOf(Lists.transform(affectedGeofences,
 		                                                                                  getGeoAlarmForGeofenceFn(context)));
 
@@ -44,12 +44,12 @@ public class GeofenceReceiver extends AbstractGeoAlarmReceiver {
 			final AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 			for (GeoAlarm alarm : currentAlarms) {
 				final long alarmTime = alarm.getAlarmManagerTime(LocalDateTime.now()).toInstant().toEpochMilli();
-				final PendingIntent intent = AlarmManagerReceiver.getPendingIntent(context);
+				final PendingIntent pendingAlarmIntent = AlarmManagerReceiver.getPendingIntent(context);
 
 				if (VERSION.SDK_INT >= VERSION_CODES.KITKAT) {
-					manager.setExact(AlarmManager.RTC_WAKEUP, alarmTime, intent);
+					manager.setExact(AlarmManager.RTC_WAKEUP, alarmTime, pendingAlarmIntent);
 				} else {
-					manager.set(AlarmManager.RTC_WAKEUP, alarmTime, intent);
+					manager.set(AlarmManager.RTC_WAKEUP, alarmTime, pendingAlarmIntent);
 				}
 			}
 
